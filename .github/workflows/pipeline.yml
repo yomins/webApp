@@ -1,0 +1,117 @@
+name: .NET Pipeline
+
+env:
+  Solution: WebApplication1.sln                  # Replace with your solution name, i.e. MyWpfApp.sln
+  PACKAGE_PATH: 'published' 
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+
+  Build:
+    runs-on: windows-latest  
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    # Install the .NET Core workload
+
+    - name: Setup .NET Framework
+      uses: microsoft/setup-msbuild@v1
+      with:
+        msbuild-version: '16.0'
+
+    # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
+    - name: Setup MSBuild.exe
+      uses: microsoft/setup-msbuild@v1.0.2
+
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1.0.5
+    
+    - name: Restore NuGet packages
+      run: nuget restore ${{ env.Solution }}
+
+    - name: Build
+      run: msbuild ${{ env.Solution }} /p:Configuration=Release
+
+    - name: Publish to folder
+      run: msbuild ${{ env.Solution }} /p:Configuration=Release /p:DeployOnBuild=true /t:WebPublish /p:WebPublishMethod=FileSystem /p:publishUrl=${{ env.PACKAGE_PATH }} /p:PackageAsSingleFile=false
+    
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: MyArtifacts
+        path: ${{ env.PACKAGE_PATH }}
+
+  analyze:
+    name: Analyze
+    runs-on: windows-latest
+    needs: [Build]
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript' , 'csharp']
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup MSBuild.exe
+      uses: microsoft/setup-msbuild@v1.0.2
+
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1.0.5
+    
+    - name: Restore NuGet packages
+      run: nuget restore ${{ env.Solution }}
+
+    - name: Build
+      run: |
+        dotnet build /p:UseSharedCompilation=false
+        msbuild ${{ env.Solution }} /p:Configuration=Release
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: ${{ matrix.language }}
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        category: "/language:javascript, /language:csharp"
+        no-trap-cache: true
+
+
+  Release:
+    permissions: write-all
+    name: Release
+    runs-on: windows-latest  
+    needs: [Build, analyze]
+    steps:
+      - name: Create actions release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        with:
+          tag_name: v0.1.8
+          release_name: Release v0.1.8
+          body: |
+            This is the my release!!
+          draft: false
+          prerelease: false
+      - uses: actions/upload-artifact@v3
+        with:
+          name: MyArtifacts
+          path: ${{ env.PACKAGE_PATH }}
