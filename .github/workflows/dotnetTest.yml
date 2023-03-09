@@ -50,50 +50,39 @@ jobs:
         path: ${{ env.PACKAGE_PATH }}
 
   analyze:
-    name: Analyze
-    runs-on: windows-latest
-    needs: [Build]
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ 'javascript' , 'csharp']
-
+    name: Analyze code with CodeQL
+    runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Setup MSBuild.exe
-      uses: microsoft/setup-msbuild@v1.0.2
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v1
+        with:
+          languages: csharp
+          # The directory where the CodeQL database will be saved
+          output: codeql-database
 
-    - name: Setup NuGet
-      uses: NuGet/setup-nuget@v1.0.5
-    
-    - name: Restore NuGet packages
-      run: nuget restore ${{ env.Solution }}
+      - name: Build project
+        run: msbuild WebApplication1.csproj /p:Configuration=Release
 
-    - name: Build
-      run: |
-        dotnet build /p:UseSharedCompilation=false
-        msbuild ${{ env.Solution }} /p:Configuration=Release
+      - name: Analyze with CodeQL
+        uses: github/codeql-action/analyze@v1
+        with:
+          # The directory where the CodeQL database was saved
+          database: codeql-database
+          # The path to the main source file
+          # Note: Replace with the actual path to your file
+          sarif-file: ./WebApplication1/Global.asax.cs
+          # The directory where the results will be saved
+          # Note: Replace with the actual path to the results directory
+          output: ./codeql-results
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
-      with:
-        languages: ${{ matrix.language }}
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
-      with:
-        category: "/language:javascript, /language:csharp"
-        no-trap-cache: true
-
-
+      - name: Upload CodeQL results
+        uses: actions/upload-artifact@v2
+        with:
+          name: codeql-results
+          path: ./codeql-results
   Release:
     permissions: write-all
     name: Release
