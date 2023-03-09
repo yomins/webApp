@@ -1,7 +1,7 @@
 name: .NET Pipeline
 
 env:
-  Solution: WebApplication1.sln                  # Replace with your solution name, i.e. MyWpfApp.sln.
+  Solution: WebApplication1.sln                  # Replace with your solution name, i.e. MyWpfApp.sln
   PACKAGE_PATH: 'published' 
 
 on:
