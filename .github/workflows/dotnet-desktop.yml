@@ -89,3 +89,13 @@ jobs:
         name: MyArtifacts
         path: ${{ env.PACKAGE_PATH }}
 
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: ${{ matrix.language }}
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        category: "/language:javascript, /language:csharp"
+        no-trap-cache: true
